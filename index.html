@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>인생네컷 프로그램 - 이미지 합성</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            text-align: center;
+            padding: 20px;
+        }
+        #cameraView {
+            border: 5px solid black;
+            width: 300px;
+            height: 300px;
+            margin: 20px auto;
+            position: relative;
+        }
+        #photoFrame {
+            border: 5px solid black;
+            width: 300px;
+            height: 300px;
+            overflow: hidden;
+            margin: 20px auto;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        #photoFrame img {
+            width: 140px;
+            height: 140px;
+            object-fit: cover;
+            margin: 5px;
+        }
+        #downloadButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>인생네컷 프로그램 - 이미지 합성</h1>
+
+    <div id="cameraView">
+        <video id="video" width="300" height="300" autoplay></video>
+    </div>
+
+    <div id="photoFrame"></div>
+
+    <button id="takePhotoButton">사진 찍기</button>
+    <button id="downloadButton">네컷 이미지 다운로드</button>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        // Get necessary DOM elements
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const photoFrame = document.getElementById('photoFrame');
+        const takePhotoButton = document.getElementById('takePhotoButton');
+        const downloadButton = document.getElementById('downloadButton');
+
+        let photos = [];
+        const maxPhotos = 4;
+        let overlayImages = ['image1.png', 'image2.png', 'image3.png', 'image4.png']; // Example overlay images
+
+        // Use getUserMedia to access the camera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                video.srcObject = stream;
+            })
+            .catch(function(err) {
+                console.error('Error accessing the camera:', err);
+            });
+
+        // Event listener for taking photo button
+        takePhotoButton.addEventListener('click', function() {
+            takePhoto();
+        });
+
+        // Function to take a photo
+        function takePhoto() {
+            // Ensure video is playing and canvas is ready
+            if (video.paused) {
+                alert('카메라를 사용할 수 없습니다.');
+                return;
+            }
+
+            // Capture photo from video stream
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Create image element for displaying the photo with overlay
+            let photoUrl = canvas.toDataURL('image/png');
+            photos.push(photoUrl);
+
+            // Display photos in the photo frame
+            displayPhotos();
+        }
+
+        // Function to display captured photos
+        function displayPhotos() {
+            photoFrame.innerHTML = '';
+
+            photos.forEach(function(photoUrl, index) {
+                // Create container for each photo
+                let photoContainer = document.createElement('div');
+                photoContainer.classList.add('photo-container');
+
+                // Create image element for displaying the photo
+                let img = document.createElement('img');
+                img.src = photoUrl;
+                photoContainer.appendChild(img);
+
+                // Add overlay image if available
+                if (overlayImages[index]) {
+                    let overlayImg = new Image();
+                    overlayImg.src = overlayImages[index];
+                    overlayImg.onload = function() {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        canvas.getContext('2d').drawImage(overlayImg, 0, 0, canvas.width, canvas.height);
+                        let overlaidPhotoUrl = canvas.toDataURL('image/png');
+                        img.src = overlaidPhotoUrl;
+                    };
+                }
+
+                photoFrame.appendChild(photoContainer);
+            });
+        }
+
+        // Event listener for download button
+        downloadButton.addEventListener('click', function() {
+            downloadCombinedImage();
+        });
+
+        // Function to download combined image
+        function downloadCombinedImage() {
+            if (photos.length !== maxPhotos) {
+                alert('4장의 사진을 모두 찍어야 합니다.');
+                return;
+            }
+
+            // Create a new canvas to composite images
+            const combinedCanvas = document.createElement('canvas');
+            combinedCanvas.width = video.videoWidth * 2;
+            combinedCanvas.height = video.videoHeight * 2;
+            const ctx = combinedCanvas.getContext('2d');
+
+            // Load each image onto the canvas
+            let xOffset = 0;
+            let yOffset = 0;
+            photos.forEach(function(photoUrl, index) {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.drawImage(img, xOffset, yOffset, video.videoWidth, video.videoHeight);
+                    xOffset += video.videoWidth;
+                    if (index % 2 !== 0) {
+                        yOffset += video.videoHeight;
+                        xOffset = 0;
+                    }
+                    if (index === photos.length - 1) {
+                        // All images are loaded, trigger download
+                        const dataURL = combinedCanvas.toDataURL('image/png');
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = dataURL;
+                        downloadLink.download = 'combined-photos.png';
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+                    }
+                };
+                img.src = photoUrl;
+            });
+        }
+    </script>
+</body>
+</html>
